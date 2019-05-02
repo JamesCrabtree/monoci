@@ -16,7 +16,7 @@ class MonoCI:
         services = []
         for filename in changed_files:
             for name, path in service_paths.items():
-                if path in filename:
+                if path in filename and name not in services:
                     services.append(name)
         return services
 
@@ -96,7 +96,7 @@ class MonoCI:
             print('------------------------------------------------------------')
             service_test = self.services.get_test_service(changed_service)
             result = service_test.test_service()
-            print(result['output'])
+            print(result['output'].decode('utf-8'))
             if result['success']:
                 print('SUCCESS')
                 print('------------------------------------------------------------')
