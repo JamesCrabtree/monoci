@@ -85,6 +85,7 @@ class MonoCI:
                 image = service_artifact.build_artifact()
             except Exception as e:
                 print(e)
+                passed = False
                 print('BUILD FAILED')
                 continue
             for line in image:
