@@ -31,6 +31,10 @@ class MonoCI:
     def get_service_paths(self, services):
         return {name: service['path'] for name, service in services.items()}
 
+    def set_environment(self, environment):
+        for key, val in environment:
+            os.environ[key] = val
+
     def run(self):
         passed = True
         try:
@@ -44,6 +48,7 @@ class MonoCI:
 
         services_yaml = '%s/services.yaml' % repo_root
         data = self.load_services_yaml(services_yaml)
+        self.set_environment(data['environment'])
         services = data['services']
         service_paths = self.get_service_paths(services)
 
