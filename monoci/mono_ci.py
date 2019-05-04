@@ -1,7 +1,9 @@
 import os
 import git
 import yaml
+import argparse
 from collections import OrderedDict
+import traceback
 from monoci.services import DefaultServices
 
 
@@ -35,7 +37,7 @@ class MonoCI:
         for key, val in environment:
             os.environ[key] = val
 
-    def run(self):
+    def run(self, test, upload):
         passed = True
         try:
             repo = git.Repo(search_parent_directories=True)
@@ -48,7 +50,8 @@ class MonoCI:
 
         services_yaml = '%s/services.yaml' % repo_root
         data = self.load_services_yaml(services_yaml)
-        self.set_environment(data['environment'])
+        if 'environment' in data:
+            self.set_environment(data['environment'])
         services = data['services']
         service_paths = self.get_service_paths(services)
 
@@ -89,41 +92,44 @@ class MonoCI:
             try:
                 image = service_artifact.build_artifact()
             except Exception as e:
-                print(e)
+                traceback.print_tb(e.__traceback__)
                 passed = False
                 print('BUILD FAILED')
                 continue
             for line in image:
                 if 'stream' in line:
                     print(line['stream'])
-            print('------------------------------------------------------------')
-            print('Testing Service: %s' % service)
-            print('------------------------------------------------------------')
-            service_test = self.services.get_test_service(changed_service)
-            result = service_test.test_service()
-            print(result['output'].decode('utf-8'))
-            if result['success']:
-                print('SUCCESS')
+            success = True
+            if test:
                 print('------------------------------------------------------------')
-                print('Versioning image')
+                print('Testing Service: %s' % service)
                 print('------------------------------------------------------------')
-                version = changed_service['build']['version']
-                version = service_artifact.version_artifact(version)
-                print('Successfully applied version %s to artifact\n' % version)
-                data['services'][service]['build']['version'] = version
-                print('------------------------------------------------------------')
-                print('Uploading image')
-                print('------------------------------------------------------------')
-                service_upload = self.services.get_upload_service(changed_service)
-                service_upload.upload_service(version)
+                service_test = self.services.get_test_service(changed_service)
+                result = service_test.test_service()
+                print(result['output'].decode('utf-8'))
+                success = result['success']
+            if success:
+                if upload:
+                    print('------------------------------------------------------------')
+                    print('Versioning image')
+                    print('------------------------------------------------------------')
+                    version = changed_service['build']['version']
+                    version = service_artifact.version_artifact(version)
+                    print('Successfully applied version %s to artifact\n' % version)
+                    data['services'][service]['build']['version'] = version
+                    print('------------------------------------------------------------')
+                    print('Uploading image')
+                    print('------------------------------------------------------------')
+                    service_upload = self.services.get_upload_service(changed_service)
+                    service_upload.upload_service(version)
             else:
                 passed = False
                 print('TESTS FAILED')
-        
-        self.dump_services_yaml(data, services_yaml)
-        repo.git.add("services.yaml")
-        repo.index.commit("[MonoCI] Automated version change.")
-        repo.git.push('--set-upstream', 'origin', 'master')
+        if upload:
+            self.dump_services_yaml(data, services_yaml)
+            repo.git.add("services.yaml")
+            repo.index.commit("[MonoCI] Automated version change.")
+            repo.git.push('--set-upstream', 'origin', 'master')
         if passed:
             print('SUCCESS')
             return 0
@@ -132,7 +138,12 @@ class MonoCI:
             return -1
 
 def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--test", action='store_true', help="Run project tests")
+    parser.add_argument("--upload", action='store_true', help="Upload project artifact to repository")
+    args = parser.parse_args()
+
     services = DefaultServices()
     monoci = MonoCI(services)
-    ret_code = monoci.run()
+    ret_code = monoci.run(args.test, args.upload)
     exit(ret_code)
