@@ -12,4 +12,4 @@ WORKDIR /srv/service
 RUN pip3.6 install --upgrade pip && \
     pip3.6 install -e monoci
 
-CMD ["python3.6"]
+CMD ["helm" "version"]
