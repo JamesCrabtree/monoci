@@ -7,7 +7,7 @@ build:
     docker: {}
   tagPolicy:
     envTemplate:
-      template: '{{.DOCKER_REGISTRY}}/jamescrabtree/monoci:{{.VERSION}}'
+      template: '{{.DOCKER_REGISTRY}}/monoci:{{.VERSION}}'
   local: {}
 deploy:
   kubectl: {}
@@ -18,7 +18,7 @@ profiles:
     - docker: {}
     tagPolicy:
       envTemplate:
-        template: '{{.DOCKER_REGISTRY}}/jamescrabtree/monoci:{{.DIGEST_HEX}}'
+        template: '{{.DOCKER_REGISTRY}}/monoci:{{.DIGEST_HEX}}'
     local: {}
   deploy:
     helm:
@@ -26,5 +26,5 @@ profiles:
       - name: monoci
         chartPath: charts/monoci
         setValueTemplates:
-          image.repository: '{{.DOCKER_REGISTRY}}/jamescrabtree/monoci'
+          image.repository: '{{.DOCKER_REGISTRY}}/monoci'
           image.tag: '{{.DIGEST_HEX}}'
