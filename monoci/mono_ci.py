@@ -2,7 +2,7 @@ import os
 import git
 import yaml
 import argparse
-from collections import OrderedDict
+import sys
 import traceback
 from monoci.services import DefaultServices
 
@@ -91,8 +91,10 @@ class MonoCI:
             service_artifact = self.services.get_artifact_service(changed_service)
             try:
                 image = service_artifact.build_artifact()
-            except Exception as e:
-                traceback.print_tb(e.__traceback__)
+            except Exception:
+                exc_type, exc_value, exc_traceback = sys.exc_info()
+                traceback.print_exception(exc_type, exc_value, exc_traceback,
+                              limit=2, file=sys.stdout)
                 passed = False
                 print('BUILD FAILED')
                 continue
