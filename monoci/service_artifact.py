@@ -1,6 +1,7 @@
 import os
 import docker
 from abc import ABC, abstractmethod
+import subprocess
 
 class Artifact(ABC):
     @abstractmethod
@@ -36,5 +37,5 @@ class DockerImage(Artifact):
         version = '.'.join(nums)
 
         image_name = self.image_name + ':' + version
-        self.image.tag(image_name)
+        subprocess.run(['docker', 'tag', self.image_name, image_name])
         return version
