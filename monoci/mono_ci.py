@@ -38,6 +38,7 @@ class MonoCI:
             os.environ[key] = val
 
     def run(self, test, upload):
+        os.environ['PYTHONUNBUFFERED'] = '1'
         passed = True
         try:
             repo = git.Repo(search_parent_directories=True)
