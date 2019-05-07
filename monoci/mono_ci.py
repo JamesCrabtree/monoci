@@ -4,6 +4,7 @@ import yaml
 import argparse
 import sys
 import traceback
+import subprocess
 from monoci.services import DefaultServices
 
 
@@ -121,7 +122,6 @@ class MonoCI:
                 changed_service = services[service]
                 if service_results[service]:
                     num_successes += 1
-                    os.environ[service] = 'SUCCESS'
                     self.log('------------------------------------------------------------')
                     self.log('Versioning image')
                     self.log('------------------------------------------------------------')
