@@ -137,10 +137,20 @@ class MonoCI:
                 service_upload.upload_service(version)
 
             self.dump_services_yaml(data, services_yaml)
+            self.log('------------------------------------------------------------')
+            self.log('Commiting version changes...')
             repo.git.add("-A")
             repo.index.commit("[MonoCI] Automated version change.")
+            self.log('Pushing version changes...')
             repo.git.push('--set-upstream', 'origin', 'master')
+            self.log('Deleting master-green tag')
+            try:
+                repo.delete_tag('master-green')
+            except:
+                self.log('No master-green tag found')
+            self.log('Tagging this commit as master-green')
             repo.create_tag('master-green')
+            self.log('Pushing tag')
             repo.git.push('--tags')
 
         if passed:
