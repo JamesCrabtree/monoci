@@ -13,9 +13,10 @@ class MonoCI:
         self.services = services
 
     def get_changed_files(self, repo):
-        if 'master-green' in repo.tags:
+        try:
             return [item.a_path for item in repo.head.commit.diff('master-green')]
-        return None
+        except:
+            return None
 
     def get_changed_services(self, changed_files, service_paths):
         if not changed_files:
@@ -146,6 +147,7 @@ class MonoCI:
             self.log('Deleting master-green tag')
             try:
                 repo.delete_tag('master-green')
+                repo.git.push('--tags')
             except:
                 self.log('No master-green tag found')
             self.log('Tagging this commit as master-green')
