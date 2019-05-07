@@ -13,9 +13,14 @@ class MonoCI:
         self.services = services
 
     def get_changed_files(self, repo):
-        return [item.a_path for item in repo.index.diff('HEAD~1')]
+        if 'master-green' in repo.tags:
+            return [item.a_path for item in repo.head.commit.diff('master-green')]
+        return None
 
     def get_changed_services(self, changed_files, service_paths):
+        if not changed_files:
+            return [name for name in service_paths]
+
         services = []
         for filename in changed_files:
             for name, path in service_paths.items():
@@ -51,7 +56,7 @@ class MonoCI:
         except:
             self.log('Command must be run from a git repository')
             return -1
-        repo.git.pull('origin', 'master')
+
         repo_root = repo.git.rev_parse("--show-toplevel")
         os.chdir(repo_root)
 
@@ -65,21 +70,23 @@ class MonoCI:
         self.log('Looking for changed files in %s' % repo_root.split('/')[-1])
         self.log('------------------------------------------------------------')
         changed_files = self.get_changed_files(repo)
-        if 'services.yaml' in changed_files:
-            changed_files.remove('services.yaml')
-        for _, service in services.items():
-            test_docker_path = os.path.join(service['path'], service['test']['path'])
-            if test_docker_path in changed_files:
-                changed_files.remove(test_docker_path)
-        if len(changed_files) < 1:
-            self.log('No Projects Modified')
-            self.log('SUCCESS')
-            return 0
-        self.log('Found modified files...')
-        self.log('------------------------------------------------------------')
-        for file in changed_files:
-            self.log('  %s\n' % file)
-        self.log('------------------------------------------------------------')
+        if changed_files:
+            if 'services.yaml' in changed_files:
+                changed_files.remove('services.yaml')
+            for _, service in services.items():
+                test_docker_path = os.path.join(service['path'], service['test']['path'])
+                if test_docker_path in changed_files:
+                    changed_files.remove(test_docker_path)
+            if len(changed_files) < 1:
+                self.log('No Projects Modified')
+                self.log('SUCCESS')
+                return 0
+            self.log('Found modified files...')
+            self.log('------------------------------------------------------------')
+            for file in changed_files:
+                self.log('  %s\n' % file)
+            self.log('------------------------------------------------------------')
+
         changed_services = self.get_changed_services(changed_files, service_paths)
         if len(changed_services) < 1:
             self.log('No Projects Modified')
@@ -135,11 +142,13 @@ class MonoCI:
                     service_upload = self.services.get_upload_service(changed_service)
                     service_upload.upload_service(version)
 
-        if upload and num_successes == len(changed_services):
+        if upload and passed:
             self.dump_services_yaml(data, services_yaml)
             repo.git.add("services.yaml")
             repo.index.commit("[MonoCI] Automated version change.")
-            repo.git.push('--set-upstream', 'origin', 'master')
+            repo.create_tag('master-green')
+            repo.git.push('--follow-tags', '--set-upstream', 'origin', 'master')
+
         if passed:
             self.log('SUCCESS')
             return 0
