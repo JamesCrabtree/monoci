@@ -48,9 +48,6 @@ class MonoCI:
 
     def run(self, test, upload):
         passed = True
-        num_successes = 0
-        service_results = {}
-
         try:
             repo = git.Repo(search_parent_directories=True)
         except:
@@ -122,32 +119,29 @@ class MonoCI:
                 service_test = self.services.get_test_service(changed_service)
                 result = service_test.test_service()
                 self.log(result['output'].decode('utf-8'))
-                service_results[service] = result['success']
-
-        if upload:
-            for service in changed_services:
-                changed_service = services[service]
-                if service_results[service]:
-                    num_successes += 1
-                    self.log('------------------------------------------------------------')
-                    self.log('Versioning image')
-                    self.log('------------------------------------------------------------')
-                    version = changed_service['build']['version']
-                    version = service_artifact.version_artifact(version)
-                    self.log('Successfully applied version %s to artifact\n' % version)
-                    data['services'][service]['build']['version'] = version
-                    self.log('------------------------------------------------------------')
-                    self.log('Uploading image')
-                    self.log('------------------------------------------------------------')
-                    service_upload = self.services.get_upload_service(changed_service)
-                    service_upload.upload_service(version)
 
         if upload and passed:
+            for service in changed_services:
+                changed_service = services[service]
+                self.log('------------------------------------------------------------')
+                self.log('Versioning image: %s' % service)
+                self.log('------------------------------------------------------------')
+                version = changed_service['build']['version']
+                version = service_artifact.version_artifact(version)
+                self.log('Successfully applied version %s to artifact\n' % version)
+                data['services'][service]['build']['version'] = version
+                self.log('------------------------------------------------------------')
+                self.log('Uploading image: %s' % service)
+                self.log('------------------------------------------------------------')
+                service_upload = self.services.get_upload_service(changed_service)
+                service_upload.upload_service(version)
+
             self.dump_services_yaml(data, services_yaml)
-            repo.git.add("services.yaml")
+            repo.git.add("-A")
             repo.index.commit("[MonoCI] Automated version change.")
+            repo.git.push('--set-upstream', 'origin', 'master')
             repo.create_tag('master-green')
-            repo.git.push('--follow-tags', '--set-upstream', 'origin', 'master')
+            repo.git.push('--tags')
 
         if passed:
             self.log('SUCCESS')
