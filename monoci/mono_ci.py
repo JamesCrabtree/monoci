@@ -37,13 +37,18 @@ class MonoCI:
         for key, val in environment:
             os.environ[key] = val
 
+    def log(self, output):
+        print(output, flush=True)
+
     def run(self, test, upload):
-        os.environ['PYTHONUNBUFFERED'] = '1'
         passed = True
+        num_successes = 0
+        service_results = {}
+
         try:
             repo = git.Repo(search_parent_directories=True)
         except:
-            print('Command must be run from a git repository')
+            self.log('Command must be run from a git repository')
             return -1
         repo.git.pull('origin', 'master')
         repo_root = repo.git.rev_parse("--show-toplevel")
@@ -56,8 +61,8 @@ class MonoCI:
         services = data['services']
         service_paths = self.get_service_paths(services)
 
-        print('Looking for changed files in %s' % repo_root.split('/')[-1])
-        print('------------------------------------------------------------')
+        self.log('Looking for changed files in %s' % repo_root.split('/')[-1])
+        self.log('------------------------------------------------------------')
         changed_files = self.get_changed_files(repo)
         if 'services.yaml' in changed_files:
             changed_files.remove('services.yaml')
@@ -66,29 +71,29 @@ class MonoCI:
             if test_docker_path in changed_files:
                 changed_files.remove(test_docker_path)
         if len(changed_files) < 1:
-            print('No Projects Modified')
-            print('SUCCESS')
+            self.log('No Projects Modified')
+            self.log('SUCCESS')
             return 0
-        print('Found modified files...')
-        print('------------------------------------------------------------')
+        self.log('Found modified files...')
+        self.log('------------------------------------------------------------')
         for file in changed_files:
-            print('  %s\n' % file)
-        print('------------------------------------------------------------')
+            self.log('  %s\n' % file)
+        self.log('------------------------------------------------------------')
         changed_services = self.get_changed_services(changed_files, service_paths)
         if len(changed_services) < 1:
-            print('No Projects Modified')
-            print('SUCCESS')
+            self.log('No Projects Modified')
+            self.log('SUCCESS')
             return 0
-        print('Builiding Services...')
-        print('------------------------------------------------------------')
+        self.log('Builiding Services...')
+        self.log('------------------------------------------------------------')
         for service in changed_services:
-            print('  %s\n' % service)
-        print('------------------------------------------------------------')
+            self.log('  %s\n' % service)
+        self.log('------------------------------------------------------------')
 
         for service in changed_services:
             changed_service = services[service]
-            print('Building Service: %s' % service)
-            print('------------------------------------------------------------')
+            self.log('Building Service: %s' % service)
+            self.log('------------------------------------------------------------')
             service_artifact = self.services.get_artifact_service(changed_service)
             try:
                 image = service_artifact.build_artifact()
@@ -97,47 +102,49 @@ class MonoCI:
                 traceback.print_exception(exc_type, exc_value, exc_traceback,
                               limit=2, file=sys.stdout)
                 passed = False
-                print('BUILD FAILED')
+                self.log('BUILD FAILED')
                 continue
             for line in image:
                 if 'stream' in line:
-                    print(line['stream'])
-            success = True
+                    self.log(line['stream'])
             if test:
-                print('------------------------------------------------------------')
-                print('Testing Service: %s' % service)
-                print('------------------------------------------------------------')
+                self.log('------------------------------------------------------------')
+                self.log('Testing Service: %s' % service)
+                self.log('------------------------------------------------------------')
                 service_test = self.services.get_test_service(changed_service)
                 result = service_test.test_service()
-                print(result['output'].decode('utf-8'))
-                success = result['success']
-            if success:
-                if upload:
-                    print('------------------------------------------------------------')
-                    print('Versioning image')
-                    print('------------------------------------------------------------')
+                self.log(result['output'].decode('utf-8'))
+                service_results[service] = result['success']
+
+        if upload:
+            for service in changed_services:
+                changed_service = services[service]
+                if service_results[service]:
+                    num_successes += 1
+                    os.environ[service] = 'SUCCESS'
+                    self.log('------------------------------------------------------------')
+                    self.log('Versioning image')
+                    self.log('------------------------------------------------------------')
                     version = changed_service['build']['version']
                     version = service_artifact.version_artifact(version)
-                    print('Successfully applied version %s to artifact\n' % version)
+                    self.log('Successfully applied version %s to artifact\n' % version)
                     data['services'][service]['build']['version'] = version
-                    print('------------------------------------------------------------')
-                    print('Uploading image')
-                    print('------------------------------------------------------------')
+                    self.log('------------------------------------------------------------')
+                    self.log('Uploading image')
+                    self.log('------------------------------------------------------------')
                     service_upload = self.services.get_upload_service(changed_service)
                     service_upload.upload_service(version)
-            else:
-                passed = False
-                print('TESTS FAILED')
-        if upload:
+
+        if upload and num_successes == len(changed_services):
             self.dump_services_yaml(data, services_yaml)
             repo.git.add("services.yaml")
             repo.index.commit("[MonoCI] Automated version change.")
             repo.git.push('--set-upstream', 'origin', 'master')
         if passed:
-            print('SUCCESS')
+            self.log('SUCCESS')
             return 0
         else:
-            print('FAILED')
+            self.log('FAILED')
             return -1
 
 def main():
