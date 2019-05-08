@@ -55,6 +55,7 @@ class MonoCI:
             self.log('Command must be run from a git repository')
             return -1
 
+        repo.git.pull()
         repo_root = repo.git.rev_parse("--show-toplevel")
         os.chdir(repo_root)
 
