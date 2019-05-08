@@ -116,7 +116,7 @@ class MonoCI:
                 result = service_test.test_service()
                 self.log(result['output'].decode('utf-8'))
 
-        if upload and passed and len(changed_services) > 1:
+        if upload and passed and len(changed_services) > 0:
             data['head'] = repo.head.object.hexsha
             for service in changed_services:
                 changed_service = services[service]
