@@ -12,16 +12,10 @@ class MonoCI:
     def __init__(self, services):
         self.services = services
 
-    def get_changed_files(self, repo):
-        try:
-            return [item.a_path for item in repo.head.commit.diff('master-green')]
-        except:
-            return None
+    def get_changed_files(self, repo, last_success):
+        return [item.a_path for item in repo.head.commit.diff(last_success)]
 
     def get_changed_services(self, changed_files, service_paths):
-        if not changed_files:
-            return [name for name in service_paths]
-
         services = []
         for filename in changed_files:
             for name, path in service_paths.items():
@@ -68,7 +62,7 @@ class MonoCI:
 
         self.log('Looking for changed files in %s' % repo_root.split('/')[-1])
         self.log('------------------------------------------------------------')
-        changed_files = self.get_changed_files(repo)
+        changed_files = self.get_changed_files(repo, data['head'])
         if changed_files:
             if 'services.yaml' in changed_files:
                 changed_files.remove('services.yaml')
@@ -122,7 +116,8 @@ class MonoCI:
                 result = service_test.test_service()
                 self.log(result['output'].decode('utf-8'))
 
-        if upload and passed:
+        if upload and passed and len(changed_services) > 1:
+            data['head'] = repo.head.object.hexsha
             for service in changed_services:
                 changed_service = services[service]
                 self.log('------------------------------------------------------------')
@@ -145,16 +140,6 @@ class MonoCI:
             repo.index.commit("[MonoCI] Automated version change.")
             self.log('Pushing version changes...')
             repo.git.push('--set-upstream', 'origin', 'master')
-            self.log('Deleting master-green tag')
-            try:
-                repo.delete_tag('master-green')
-                repo.git.push('--tags')
-            except:
-                self.log('No master-green tag found')
-            self.log('Tagging this commit as master-green')
-            repo.create_tag('master-green')
-            self.log('Pushing tag')
-            repo.git.push('--tags')
 
         if passed:
             self.log('SUCCESS')
